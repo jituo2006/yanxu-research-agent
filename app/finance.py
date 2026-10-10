@@ -96,15 +96,15 @@ def audit_text(text, facts, calculations, year):
                 precision=len(match[1].split(".")[1]) if "." in match[1] else 0
                 tolerance=multiplier*(Decimal(10)**(-precision))/2
                 if abs(stated-current[metric])>tolerance:
-                    issues.append({"type":"value_mismatch","claim":match[0],"message":f"{meta['label']}与当前核验值不一致","expected_100m":str(current[metric]/Decimal(100000000)),"fact_id":f"{metric}-{year}","span":[match.start(),match.end()]})
+                    issues.append({"type":"value_mismatch","claim":match[0],"message":f"{meta['label']}与当前结构化值不一致","expected_100m":str(current[metric]/Decimal(100000000)),"fact_id":f"{metric}-{year}","span":[match.start(),match.end()]})
     cash=current.get("n_cashflow_act")
     profit=current.get("n_income_attr_p")
     if cash is not None and profit is not None:
         if cash>profit and re.search(r"现金流[^。；\n]{0,20}(?:比|低于)[^。；\n]{0,10}利润[^。；\n]{0,5}(?:小|低)|现金流[^。；\n]{0,10}低于(?:归母净)?利润",text):
-            issues.append({"type":"relation_mismatch","claim":"现金流小于利润","message":"已核验现金流大于归母净利润；原文大小关系相反"})
+            issues.append({"type":"relation_mismatch","claim":"现金流小于利润","message":"结构化现金流大于归母净利润；原文大小关系相反"})
     cash_yoy=next((number(c["value"]) for c in calculations if c["metric"]=="n_cashflow_act"),None)
     if cash_yoy is not None and cash_yoy<0 and re.search(r"现金流[^。；，,\n]{0,20}(?:同比)?(?:增长|增加|上升)\s*\+?\d",text):
-        issues.append({"type":"direction_mismatch","claim":"现金流同比增长","message":"已核验经营现金流同比下降，请检查符号和方向"})
+        issues.append({"type":"direction_mismatch","claim":"现金流同比增长","message":"结构化经营现金流同比下降，请检查符号和方向"})
     if any(s in text for s in ["盈利质量全面改善","盈利质量必然恶化","保证收益","稳赚"]):
         issues.append({"type":"unsupported_conclusion","claim":"强结论","message":"汇总财务数据不足以支持该判断，需要附注、营运资本或其他证据"})
     if re.search(r"(?:表明|说明|证明)[^。；\n]{0,8}(?:利润)?现金含量(?:尚可|较高|改善)|则利润质量恶化",text):

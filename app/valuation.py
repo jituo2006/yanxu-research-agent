@@ -2,6 +2,7 @@
 from decimal import Decimal,InvalidOperation
 import uuid
 from . import store
+from .fact_state import verification
 
 def field(key,label,unit="",required=True,minimum=None,maximum=None):
     return {"key":key,"label":label,"unit":unit,"required":required,"min":minimum,"max":maximum}
@@ -71,6 +72,9 @@ def calculate(run,method,inputs,origin="form",quotes=None):
     if method in ("pe","ps"):
         fact=next((f for f in run["facts"] if f["metric"]==spec["metric"] and f["year"]==run["request"]["year"] and f["status"]!="conflict"),None)
         if not fact or Decimal(fact["value"])<=0: raise ValueError("缺少无冲突且为正的历史基数，不能计算该方法")
+        if not verification(fact,run.get("evidence",[]),run["request"].get("as_of"))["usable_for_calculation"]:
+            raise ValueError("历史基数缺失、来源未确认或OCR待复核，不能采用")
+        notes.append("基数来源状态："+verification(fact,run.get("evidence",[]))["label"]+"；确定性计算不升级来源可信度。")
         base=Decimal(fact["value"])/Decimal(100000000);fact_ids=[fact["id"]]
         forecast=base*(1+values["growth_pct"]/100)
         out.update(base_100m=base,forecast_100m=forecast,equity_value_100m=forecast*values["multiple"])

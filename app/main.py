@@ -210,7 +210,8 @@ async def conversation_events(cid:str):
 def get(run_id:str):
     from .report_state import report_valuation_status
     run=store.get_run(run_id)
-    return run | {"report_valuation_status":report_valuation_status(run)}
+    from .fact_state import enrich
+    return enrich(run) | {"report_valuation_status":report_valuation_status(run)}
 
 @app.post("/api/runs/{run_id}/retry",status_code=202)
 def retry(run_id:str):
@@ -258,7 +259,8 @@ def calculate_scenario(run_id:str,request:ScenarioRequest):
 def review(run_id:str,request:ReviewRequest):
     run=store.get_run(run_id)
     if not run["facts"]: raise ValueError("当前任务没有财务事实可用于核查")
-    issues=audit_text(request.text,run["facts"],run["calculations"],run["request"]["year"])
+    from .fact_state import claims
+    issues=audit_text(request.text,run["facts"],run["calculations"],run["request"]["year"])+claims(request.text,run)
     return {"issues":issues,"scope":"仅检查本期核心三项指标的金额、现金流增长方向、部分大小关系和过强结论；不代表全文已核验。",
         "status":"issues_found" if issues else "no_rule_hits"}
 

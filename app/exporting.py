@@ -5,6 +5,7 @@ from copy import deepcopy
 from html import escape
 from decimal import Decimal
 from .finance import METRICS,number
+from .fact_state import verification
 
 DOCUMENT_LINK = re.compile(r'(?:https?://(?:127\.0\.0\.1|localhost)(?::\d+)?)?/api/documents/([\w-]+)/file')
 
@@ -144,6 +145,7 @@ def markdown(run, audit=False, document_paths=None):
         c=next((c for c in run["calculations"] if c["metric"]==metric),None)
         rate=calculation_change(c)
         lines.append(f"| {meta['label']} | {vals[0]} | {vals[1]} | {rate} |")
+    lines += ["\n来源状态："+"；".join(f["label"]+" "+str(f["year"])+"："+verification(f,run.get("evidence",[]))["label"] for f in run["facts"])]
     lines += ["\n同比公式：(本期 / 上期 - 1) × 100%；零或负基期不套用该公式。",
         "\n## 研究判断（待复核）",memo.get("summary","研究尚未完成。")]
     if memo.get('stance'): lines += ['研究立场：'+memo['stance']]
@@ -190,7 +192,7 @@ def printable(run, audit=False, document_paths=None):
         previous=next((f for f in run["facts"] if f["metric"]==metric and f["year"]==req["year"]-1),None)
         calc=next((c for c in run["calculations"] if c["metric"]==metric),None)
         rate=calculation_change(calc)
-        state={"verified":"双源一致","document_only":"披露文件","api_only":"接口来源","conflict":"来源冲突"}.get(current["status"],"") if current else "缺失"
+        state=verification(current,run.get("evidence",[]))["label"] if current else "缺失"
         rows.append(f"<tr><th>{e(meta['label'])}</th><td>{amount(current)}</td><td>{amount(previous)}</td><td>{rate}</td><td>{state}</td></tr>")
     sections=[]
     for t in memo.get("theses",[]):
