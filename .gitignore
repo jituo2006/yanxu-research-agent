@@ -17,3 +17,5 @@ docs/*.zip
 docs/*.pdf
 
 var-competition/
+
+.venv-validation/

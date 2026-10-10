@@ -154,6 +154,13 @@ def markdown(run, audit=False, document_paths=None):
             "反方证据/替代解释："+t["counter_evidence"],"修订条件："+t["invalidate_if"]]
     for s in memo.get('sections',[]):
         lines += ['\n## '+s['title'],s['body'],'依据：'+(reference_markdown(memo,s.get('evidence_ids',[])) or '证据待补充')]
+    from .questions import snapshot
+    question_view=snapshot(run)
+    lines += ['\n## 问题级证据清单',question_view['note']]
+    for q in question_view['items']:
+        lines += ['\n### '+q['question']+' · '+q['label'],q.get('answer') or '尚未回答','完成条件：'+q['completion_criteria']]
+        for b in q.get('bindings',[]): lines += ['- '+b['relation']+'：'+b['quote']+'（'+b['title']+'） · '+b['reason']]
+        lines += ['反方：'+(q.get('counter_evidence') or '待补充')]+['缺口：'+g for g in q.get('gaps',[])]
     if memo.get('questions'): lines += ['\n## 下一步核实清单']+['- '+q for q in memo['questions']]
     if memo.get('sources'):
         lines += ['\n## 研究来源目录']
@@ -219,6 +226,13 @@ def printable(run, audit=False, document_paths=None):
         scenario_html+="<h2>报告修订记录</h2>"+"".join("<details><summary>第 "+str(v["revision"])+" 版 · "+e(v["change_note"])+"</summary><pre>"+e(json.dumps(v["memo"],ensure_ascii=False,indent=2))+"</pre></details>" for v in run["memo_revisions"])
     if audit and run.get("attached_documents"):
         scenario_html+="<h2>对话补充材料</h2><p>已接入全文查阅，未自动覆盖已核验财务事实。</p>"+"".join("<pre>"+e(json.dumps(d,ensure_ascii=False,indent=2))+"</pre>" for d in run["attached_documents"])
+    from .questions import snapshot
+    question_view=snapshot(run)
+    scenario_html+='<h2>问题级证据清单</h2><p>'+e(question_view['note'])+'</p>'
+    for q in question_view['items']:
+        scenario_html+='<article><h3>'+e(q['question'])+' · '+e(q['label'])+'</h3><p>'+e(q.get('answer') or '尚未回答')+'</p><p>完成条件：'+e(q['completion_criteria'])+'</p>'
+        for b in q.get('bindings',[]):scenario_html+='<blockquote>'+e(b['quote'])+'</blockquote><p>'+e(b['title']+' · '+b['reason'])+'</p>'
+        scenario_html+='<p>反方：'+e(q.get('counter_evidence') or '待补充')+'</p><ul>'+''.join('<li>'+e(g)+'</li>' for g in q.get('gaps',[]))+'</ul></article>'
     events="".join("<li>"+e(v["time"])+" · "+e(v["label"])+"："+e(v["detail"])+"</li>" for v in run["events"])
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>{e(run['company'])} · 研究底稿</title>
 <style>body{{font:14px/1.85 system-ui,"Microsoft YaHei",sans-serif;color:#334155;margin:45px auto;padding:0 28px;max-width:980px}}header{{border-bottom:3px solid #a02070;padding-bottom:24px}}.brand{{font-size:12px;letter-spacing:2px;color:#64748b}}h1{{font-size:29px;margin:14px 0}}h2{{margin-top:34px;font-size:20px;color:#475569}}h3{{font-size:15px}}.muted{{font-size:12px;color:#64748b}}table{{width:100%;border-collapse:collapse;text-align:right;font-variant-numeric:tabular-nums}}td,th{{padding:12px;border-bottom:1px solid #e2e8f0}}thead{{background:#f8fafc}}th:first-child{{text-align:left}}.summary,.counter{{padding:18px;background:#fcf6fa;border-left:3px solid #e5bed5}}.thesis{{margin:22px 0}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 monospace;background:#f8fafc;padding:15px;border:1px solid #e2e8f0}}a{{color:#a02070}}li{{margin:7px 0}}details{{margin:18px 0}}summary{{cursor:pointer;font-weight:600}}footer{{border-top:1px solid #e2e8f0;margin-top:35px;padding-top:16px}}@media print{{body{{margin:0;max-width:none;font-size:11px}}h2,h3{{break-after:avoid}}tr,.counter{{break-inside:avoid}}.print-hint{{display:none}}}}</style></head><body>

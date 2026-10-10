@@ -21,6 +21,10 @@ function Show-ResearchServer($health) {
     }
     $expectedCompetition = $env:RESEARCH_COMPETITION_MODE -eq '1'
     if ([bool]$health.competition -ne $expectedCompetition) { throw 'Port 8920 is running another mode. Stop it before switching workspaces.' }
+    $expectedData = [System.IO.Path]::GetFullPath($runtimeRoot)
+    if (-not $health.data_directory -or [System.IO.Path]::GetFullPath($health.data_directory) -ne $expectedData) {
+        throw 'Port 8920 is running another data workspace. Stop that workspace before switching.'
+    }
     $pageId = 'missing-build'
     if (Test-Path -LiteralPath $indexPath) {
         $hasher = [System.Security.Cryptography.SHA256]::Create()

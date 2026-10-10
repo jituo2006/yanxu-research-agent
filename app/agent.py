@@ -13,6 +13,7 @@ from .providers import model_json,ProviderError
 from .turn_constraints import constraints, enforce, latest_user, coverage, canonical_url
 from .report_state import report_valuation_status
 from .fact_state import claims, enrich
+from . import questions
 
 SYSTEM="""你是研序，一位与用户合作的A股投研助手。使用中文。主动讨论研究思路、方法适用性、反证和还需取得的资料。
 你可以决定调用哪些工具，多次观察结果后再继续，也可以直接回答或追问。不能假装已经执行工具。
@@ -49,7 +50,10 @@ PE、PS 的历史基数由程序从已核验事实读取，不能替换。DCF �
 完整业务、产品、最新经营或估值研究用 build_investment_memo；已有深度报告且不需补充新资料时用 refine_investment_memo。二者支持PDF页/网页/财务/估值分别引用，不能用空fact_ids把原文硬塞进简版报告。
 报告每个论点要有引用、反证、失效条件；估值假设与历史事实保持区分。
 工具失败可修正重试一次或解释缺口。若结果已完成，简要总结实际变化并停止，不重复调用。
+研究完成度以question_coverage为准：支持状态必须有实际原文摘录及日期，搜索摘要/来源数量不能算问题回答完成。每项证据需说明如何回答该问题，支持关系仍需研究员复核。
 可用工具：
+plan_research_questions: {questions:[{question:具体问题,completion_criteria:所需证据}]}。建立细分问题，不覆盖旧问题；把产品存在、收费合同、分项收入、回款拆开。
+update_research_question: {question_id:已存在问题ID,answer:答案,status:pending|partial|supported|conflict|unverifiable,bindings:[{source_id:实际来源ID,quote:原文连续摘录,relation:support|counter,reason:与问题的具体关系}],counter_evidence:反方说明,gaps:[缺口],next_action:下一步}。保存问题级证据，摘录必须匹配已读来源；不能将摘要数量当完成度。
 search_company: {query:公司名称或代码}，目录中模糊匹配。
 start_research: {ticker:带SZ/SH/BJ后缀代码,year:年度,question:研究问题,document_id:可选}。按本轮数据源和今天截止，建立财务底稿；后续可检索或修订。
 fetch_annual_report: {ticker:可选带后缀代码,year:可选年度}。有当前研究时自动使用当前公司年度和截止日；从巨潮查找下载年报全文，校验身份后接入当前对话，不依赖 Tushare。
@@ -80,6 +84,7 @@ def context(chat):
     return {k:run.get(k) for k in ("id","company","request","state","facts","calculations","gaps","report_revision")}|{"memo":memo,
         "valuations":run.get("valuation_history",[])[-4:],"report_valuation_status":report_valuation_status(run),
         "unread_web_links":run.get('research_links',[])[-20:],
+        "question_coverage":questions.snapshot(run),"question_evidence_catalog":questions.bounded_catalog(run),
         "research_sources":[{**s,"text":s.get("text","")[:2200]} for s in run.get("research_sources",[])[-30:]]}
 
 
@@ -259,6 +264,8 @@ def tool(chat,name,args):
         return {"run_id":run["id"],"company":run["company"],"state":run["state"],"fact_count":len(run["facts"]),"gaps":run["gaps"],"artifact":"research"}
     if not chat.get("run_id"): raise ValueError("请先选择或创建一份公司研究")
     run=store.get_run(chat["run_id"])
+    if name=="plan_research_questions": return questions.plan(run['id'],args.get('questions',[]))
+    if name=="update_research_question": return questions.update(run['id'],[args],'model')
     if name in ("build_investment_memo","refine_investment_memo"):
         def progress(label):
             def change(c):
@@ -416,6 +423,8 @@ def execute(cid):
                 message=with_document_citations(message[:12000],results)
                 message=with_web_citations(message,results)
                 observed=coverage([s for s in chat['steps'] if s['turn_id']==turn_id],user_text,saved_sources,message)
+                if chat.get('run_id'):
+                    observed['question_coverage']=questions.snapshot(store.get_run(chat['run_id']))
                 if observed['status']=='partial':
                     message='正文查证未完成：本轮搜索 '+str(observed['search_calls'])+' 次，取得 '+str(observed['search_results'])+' 条结果，新增正文 0。搜索摘要只能作为线索，以下回答不能视为已完成正文核验。\n\n'+message
                 if "report" in required and "report" not in actual and report_failures:
@@ -431,6 +440,8 @@ def execute(cid):
             name=memo_tool_for_request(str(decision.get("tool","")),chat,results);args=decision.get("arguments",{})
             if name=='build_investment_memo' and sum(r.get('tool')==name and bool(r.get('result',{}).get('error')) for r in results)>=2:
                 raise ProviderError('深度报告经过修订仍未通过校验，已停止重复生成。旧报告和已取得来源均保留；可调整研究范围后再试。')
+            if name=='web_search' and any(r.get('tool')=='web_search' and any(s in str(r.get('result',{}).get('error','')) for s in ('搜索次数','只用指定材料')) for r in results):
+                raise ProviderError('搜索已受限制，停止重复尝试。已有材料保留，请继续查阅原文或研究问题缺口。')
             sid=uuid.uuid4().hex[:12]
             event={"id":sid,"turn_id":turn_id,"tool":name,"message":str(decision.get("message","执行研究工具"))[:350],
                    "arguments":args,"state":"running","started_at":store.now()}

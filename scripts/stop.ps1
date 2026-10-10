@@ -1,6 +1,8 @@
+param([string]$Workspace='')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
-$stateFile=Join-Path $projectRoot 'var\server.json'
+$runtimeRoot = if ($Workspace) { $Workspace } elseif ($env:RESEARCH_DATA_DIR) { $env:RESEARCH_DATA_DIR } else { Join-Path $projectRoot 'var' }
+$stateFile=Join-Path $runtimeRoot 'server.json'
 if (-not (Test-Path -LiteralPath $stateFile)) { Write-Host 'No recorded Research Desk server.'; exit 0 }
 $state=Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
 $process=Get-Process -Id $state.processId -ErrorAction SilentlyContinue

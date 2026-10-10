@@ -24,6 +24,8 @@ def create_run(request, parent=None):
            "request": request, "parent_id": parent, "company": request["ticker"], "facts": [], "evidence": [],
            "calculations": [], "checks": [], "gaps": [], "events": [], "memo": None,
            "model": {"status": "not_requested"}, "scenario_history": [], "valuation_history": [], "memo_revisions": [], "report_revision": 1, "version": VERSION}
+    from .questions import create as create_question
+    run["research_questions"]=[create_question(request.get("question","当前研究还有哪些证据缺口？"))]
     with connection() as c:
         c.execute("BEGIN IMMEDIATE")
         active = c.execute("SELECT COUNT(*) FROM runs WHERE state IN ('queued','running')").fetchone()[0]

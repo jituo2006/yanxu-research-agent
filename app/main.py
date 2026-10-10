@@ -70,7 +70,7 @@ def launch(run):
 
 @app.get("/api/health")
 def health():
-    return {"status":"ok","service":"Research Desk","version":VERSION,"competition":competition.POLICY["enabled"]}
+    return {"status":"ok","service":"Research Desk","version":VERSION,"competition":competition.POLICY["enabled"],"data_directory":str(DATA.resolve())}
 
 @app.get("/api/settings")
 def configuration():
@@ -211,7 +211,8 @@ def get(run_id:str):
     from .report_state import report_valuation_status
     run=store.get_run(run_id)
     from .fact_state import enrich
-    return enrich(run) | {"report_valuation_status":report_valuation_status(run)}
+    from .questions import snapshot
+    return enrich(run) | {"report_valuation_status":report_valuation_status(run),"question_coverage":snapshot(run)}
 
 @app.post("/api/runs/{run_id}/retry",status_code=202)
 def retry(run_id:str):
@@ -333,6 +334,28 @@ def page_image(doc_id:str,page:int):
                 finally: bitmap.close()
             finally: pdf_page.close()
     return FileResponse(output,media_type="image/png")
+
+@app.get("/api/runs/{run_id}/questions")
+def research_questions(run_id:str):
+    from .questions import snapshot
+    return snapshot(store.get_run(run_id))
+
+@app.get("/api/runs/{run_id}/question-sources")
+def research_question_sources(run_id:str):
+    from .questions import bounded_catalog
+    return bounded_catalog(store.get_run(run_id))
+
+@app.post("/api/runs/{run_id}/questions")
+def research_questions_plan(run_id:str,request:dict):
+    from .questions import plan
+    if store.get_run(run_id)['state'] in ('queued','running'): raise ValueError('请等待当前任务完成')
+    return plan(run_id,request.get('questions',[]))
+
+@app.post("/api/runs/{run_id}/question-answers")
+def research_questions_update(run_id:str,request:dict):
+    from .questions import update
+    if store.get_run(run_id)['state'] in ('queued','running'): raise ValueError('请等待当前任务完成')
+    return update(run_id,request.get('answers',[]),'human')
 
 @app.get("/api/competition")
 def competition_status(): return competition.status()

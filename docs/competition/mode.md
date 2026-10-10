@@ -10,6 +10,8 @@ powershell -File scripts/start-competition.ps1 -Workspace .\var-competition -Pol
 
 策略分别配置 `model_origins` 与 `retrieval_origins`，按协议、域名和端口精确匹配，无通配符。示例只许可DeepSeek模型接口，不许可资料联网。模型连接和凭据仍通过连接设置/环境变量配置；许可不意味着已配置可用模型。更换策略或工作区必须停止原服务并重启。
 
+停止指定比赛工作区：`powershell -File scripts/stop.ps1 -Workspace .\var-competition`。启动会同时核对版本、模式和工作区，防止复用另一目录的服务。
+
 页面“比赛工作区”显示当前模式、许可与目录；导入JSON/CSV，选择已上传PDF，建立指定材料任务，下载提交包。PDF仍通过资料库上传。
 
 JSON为行数组或 `{"rows":[...]}`，CSV为相同字段：metric、year、value、unit、currency、scope、period_type、announced_date。目前支持三项核心年度指标，单位元/千元/万元，CNY、consolidated、annual；每行公告日不晚于截止日。缺公告日的行保留缺口，不合入事实；未知指标不并入现有计算。导入数据属于单源材料，不自动升级为独立双源核验。
@@ -19,7 +21,7 @@ JSON为行数组或 `{"rows":[...]}`，CSV为相同字段：metric、year、valu
 CLI也可处理固定任务（PDF扫描OCR仍有Windows限制）：
 
 ```sh
-python scripts/run_competition.py --workspace var-competition --ticker 000333.SZ --year 2025 --as-of 2026-09-28 --material examples/competition-financials.csv
+python scripts/run_competition.py --workspace var-competition --ticker 600001.SH --year 2025 --as-of 2026-09-28 --material examples/competition-financials.csv
 ```
 
 默认不调用模型，加 `--model --policy examples/competition-policy.json` 才运行真实深度研究；无凭据或失败会以非零退出，不能冒充真实LLM成功。

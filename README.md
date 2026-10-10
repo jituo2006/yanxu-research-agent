@@ -1,4 +1,4 @@
-# 研序 · 对话投研 Agent v0.3.1
+# 研序 · 对话投研 Agent v0.4.0
 
 **面向 A 股的可追溯投研与估值智能体。** 主要用于财报分析、研究纠错、估值情景和买方备忘录；量化选股、策略回测与交易执行属于后续扩展。
 
@@ -144,6 +144,7 @@ DCF 和 EV/EBITDA 先得到企业价值。**股权桥接扣减项 = 净债务 + 
 
 - [当前架构与能力边界](docs/architecture.md)
 - [比赛需求与分阶段计划](docs/competition/plan.md)
+- [v0.4.0 本轮验收](docs/competition/acceptance-v0.4.0.md)
 - [复现与运行说明](docs/reproducibility.md)
 - [数据状态与核验口径](docs/finance/fact-status.md)
 - [第三方来源与团队贡献](docs/third-party.md)
@@ -153,3 +154,7 @@ DCF 和 EV/EBITDA 先得到企业价值。**股权桥接扣减项 = 净债务 + 
 ### 受控比赛工作区
 
 已支持独立材料目录、模型/资料来源许可、JSON/CSV导入、审计和提交包。启动与数据格式见 [比赛模式](docs/competition/mode.md)。应用层限制不替代比赛机器的网络隔离。
+
+### 事实状态与研究问题
+
+接口单源、原文单源、跨源数值一致、冲突与OCR待复核使用统一标签，见 [状态口径](docs/finance/fact-status.md)。页面“问题与证据”保存每项答案、原文、反证、缺口及版本；详见 [问题清单](docs/competition/questions.md)。原文匹配不代表金融语义已经独立验证。

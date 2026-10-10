@@ -39,6 +39,8 @@ def enforce(chat, name):
         done = sum(s.get('turn_id') == chat.get('turn_id') and s.get('tool') == 'web_search' and s.get('state') == 'completed' for s in chat.get('steps', []))
         if done >= rules['search_limit']:
             raise ValueError('已达到用户限定的搜索次数，请查阅已找到的正文或说明缺口。')
+    if name in ('plan_research_questions','update_research_question') and re.search(r'只读|不(?:要)?保存|不(?:要)?修改',latest_user(chat)):
+        raise ValueError('本轮只读要求禁止修改研究问题记录')
     return rules
 
 

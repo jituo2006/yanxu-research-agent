@@ -94,6 +94,7 @@ def test_submission_hashes_and_no_credentials(controlled):
 
 def test_material_import_and_submission_api(controlled):
     with TestClient(main.app) as client:
+        assert client.get('/api/health').json()['data_directory']==str(controlled.resolve())
         response=client.post('/api/competition/materials',data={'ticker':'600001.SH','year':'2025'},files={'file':('fixed.json',json.dumps(rows()).encode(),'application/json')})
         assert response.status_code==200
         assert client.get('/api/competition').json()['enabled'] is True
