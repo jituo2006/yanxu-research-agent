@@ -30,6 +30,8 @@ def create_run(request, parent=None):
         if active >= 2:
             raise ValueError("已有两项研究正在进行，请等待完成或取消其中一项")
         c.execute("INSERT INTO runs (id,created,state,payload) VALUES (?,?,?,?)", (run_id,run["created_at"],run["state"],json.dumps(run,ensure_ascii=False)))
+    from . import competition
+    competition.audit("run_created",run_id=run_id,request=request,policy=competition.POLICY)
     return run
 
 def get_run(run_id):
@@ -40,6 +42,8 @@ def get_run(run_id):
     return json.loads(row[0])
 
 def save_run(run):
+    from . import competition
+    competition.audit("run_snapshot",run_id=run["id"],snapshot=run)
     run["updated_at"] = now()
     with connection() as c:
         c.execute("UPDATE runs SET state=?,payload=? WHERE id=?", (run["state"],json.dumps(run,ensure_ascii=False,allow_nan=False),run["id"]))
@@ -51,6 +55,8 @@ def update_run(run_id,change):
         if not row: raise KeyError(run_id)
         run=json.loads(row[0]);change(run);run["updated_at"]=now()
         c.execute("UPDATE runs SET state=?,payload=? WHERE id=?",(run["state"],json.dumps(run,ensure_ascii=False,allow_nan=False),run_id))
+    from . import competition
+    competition.audit("run_update",run_id=run_id,snapshot=run)
     return run
 
 def new_conversation(run_id=None):

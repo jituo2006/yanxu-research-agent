@@ -1,3 +1,4 @@
+from . import competition
 """Public annual-report discovery. Does not use a Tushare token or LLM-generated URLs."""
 import html
 import re
@@ -18,6 +19,8 @@ def annual_candidates(ticker,year,as_of=None):
     code,exchange=ticker.split(".")
     if cutoff<date(year+1,1,1): return {"items":[],"note":"截止日早于年度结束后的披露期"}
     try:
+        competition.check_network(ROOT+"/new/information/topSearch/query")
+        competition.check_network(ROOT+"/new/hisAnnouncement/query")
         with httpx.Client(timeout=25,headers=HEADERS) as client:
             r=client.post(ROOT+"/new/information/topSearch/query",data={"keyWord":code,"maxNum":"10"});r.raise_for_status()
             matches=[v for v in r.json() if v.get("code")==code and v.get("category")=="A股"]
@@ -62,6 +65,7 @@ def fetch_annual(ticker,year,as_of=None):
     parsed=urlparse(url)
     if parsed.scheme!="https" or parsed.netloc!="static.cninfo.com.cn": raise ValueError("年报下载来源无效")
     try:
+        competition.check_network(url)
         with httpx.Client(timeout=60,headers=HEADERS,follow_redirects=False) as client:
             with client.stream("GET",url) as response:
                 response.raise_for_status();chunks=[];size=0

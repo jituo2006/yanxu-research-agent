@@ -1,3 +1,5 @@
+from . import competition
+import io
 import hashlib
 import json
 import math
@@ -25,10 +27,10 @@ def seed():
     if path.exists():
         put_document({"id":SAMPLE_ID,"title":"美的集团 2025 年年度报告摘要","ticker":"000333.SZ","year":2025,
             "announced_date":"2026-03-31","path":str(path),"source_url":"https://static.cninfo.com.cn/finalpage/2026-03-31/1225058109.PDF",
-            "sha256":hashlib.sha256(path.read_bytes()).hexdigest(),"created_at":"2026-09-28T09:45:43+00:00","kind":"official_sample"})
+            "sha256":hashlib.sha256(competition.read_bytes(path)).hexdigest(),"created_at":"2026-09-28T09:45:43+00:00","kind":"official_sample"})
 
 def pages_for(doc):
-    with pdfplumber.open(doc["path"]) as pdf:
+    with pdfplumber.open(io.BytesIO(competition.read_bytes(doc["path"]))) as pdf:
         if len(pdf.pages)>MAX_PAGES:
             raise ValueError(f"支持不超过 {MAX_PAGES} 页的 PDF")
         return [p.extract_text() or "" for p in pdf.pages]
@@ -149,14 +151,14 @@ def register_pdf(content,ticker,year,title,announced_date=None,source_url=None,k
 def ensure_index(doc):
     folder=store.DATA/"documents";folder.mkdir(parents=True,exist_ok=True)
     path=folder/(doc["id"]+".pages.json")
-    if path.exists(): pages=json.loads(path.read_text(encoding="utf-8"))
+    if path.exists(): pages=competition.read_json(path)
     else:
-        pages=text_pages(Path(doc["path"]).read_bytes())
+        pages=text_pages(competition.read_bytes(doc["path"]))
         temp=path.with_suffix("."+uuid.uuid4().hex+".tmp")
         temp.write_text(json.dumps(pages,ensure_ascii=False),encoding="utf-8");temp.replace(path)
     raw_count=sum(bool(p.strip()) for p in pages)
     ocr_path=folder/(doc["id"]+".ocr.json")
-    ocr_data=json.loads(ocr_path.read_text(encoding="utf-8")) if ocr_path.exists() else {}
+    ocr_data=competition.read_json(ocr_path) if ocr_path.exists() else {}
     for page,item in ocr_data.items():
         if 1<=int(page)<=len(pages) and not pages[int(page)-1].strip(): pages[int(page)-1]=item["text"]
     missing=[i+1 for i,p in enumerate(pages) if not p.strip()]
@@ -287,7 +289,7 @@ def read_attached(chat,doc_id,page,count=1):
         from .ocr import recognize
         with PDF_LOCK: recognized=recognize(doc["path"],missing)
         path=store.DATA/"documents"/(doc_id+".ocr.json")
-        old=json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        old=competition.read_json(path) if path.exists() else {}
         old.update({str(n):{"text":text,"engine":"Windows OCR zh-Hans-CN","recognized_at":store.now()} for n,text in recognized.items()})
         temp=path.with_suffix("."+uuid.uuid4().hex+".tmp");temp.write_text(json.dumps(old,ensure_ascii=False),encoding="utf-8");temp.replace(path)
         pages=ensure_index(doc)

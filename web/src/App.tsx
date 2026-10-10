@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {Activity,ArrowDownToLine,ArrowRight,ArrowUpRight,BookOpen,Check,CheckCircle2,ChevronRight,Clock3,Database,ExternalLink,FileSearch,FileText,FolderOpen,GitCompareArrows,History,Layers3,LoaderCircle,Plus,Search,Settings2,ShieldCheck,SlidersHorizontal,Sparkles,Square,Upload,X,AlertCircle,Command,MessageSquare,Trash2} from 'lucide-react';
 
 import AgentChat from './AgentChat';
+import CompetitionPanel from './CompetitionPanel';
 import HistoryTrash from './HistoryTrash';
 import CompanySearch from './CompanySearch';
 import ConnectionSettings from './ConnectionSettings';
@@ -10,7 +11,7 @@ import MemoView from './MemoView';
 import './agent.css';
 
 type Run=any;
-const labels:any={chat:'研究对话',overview:'公司研究',model:'估值建模',audit:'数据核验',history:'研究版本',library:'资料库',settings:'连接设置',trash:'回收站'};
+const labels:any={chat:'研究对话',overview:'公司研究',model:'估值建模',audit:'数据核验',history:'研究版本',library:'资料库',settings:'连接设置',trash:'回收站',competition:'比赛工作区'};
 const metricIds=['revenue','n_income_attr_p','n_cashflow_act'];
 const factStatus:any={verified:'双源一致',document_only:'披露文件',api_only:'接口来源',conflict:'来源冲突'};
 const metricNames=['营业收入','归母净利润','经营现金流净额'];
@@ -73,7 +74,7 @@ export default function App(){
       <button className="brand" aria-label="研序首页" onClick={()=>setTab('chat')}><span className="brand-mark"><Layers3 size={23}/></span><span>研序</span><span className="brand-version" title="当前运行的应用版本">{config.version?'v'+config.version:''}</span></button>
       <button className="new-research" aria-label="新建研究" onClick={()=>setShowNew(true)}><Plus size={17}/><span>新建研究</span></button>
       <nav aria-label="研究导航">{[[MessageSquare,'chat'],[BookOpen,'overview'],[SlidersHorizontal,'model'],[ShieldCheck,'audit'],[History,'history']].map(([Icon,id]:any)=><button key={id} aria-label={labels[id]} title={labels[id]} aria-current={tab===id?'page':undefined} className={tab===id?'active':''} onClick={()=>setTab(id)}><Icon size={18}/><span>{labels[id]}</span></button>)}</nav>
-      <nav className="secondary-nav" aria-label="资料与设置">{[[FolderOpen,'library'],[Settings2,'settings'],[Trash2,'trash']].map(([Icon,id]:any)=><button key={id} aria-label={labels[id]} title={labels[id]} aria-current={tab===id?'page':undefined} className={tab===id?'active':''} onClick={()=>setTab(id)}><Icon size={18}/><span>{labels[id]}</span></button>)}</nav>
+      <nav className="secondary-nav" aria-label="资料与设置">{[[FolderOpen,'library'],[Settings2,'settings'],[ShieldCheck,'competition'],[Trash2,'trash']].map(([Icon,id]:any)=><button key={id} aria-label={labels[id]} title={labels[id]} aria-current={tab===id?'page':undefined} className={tab===id?'active':''} onClick={()=>setTab(id)}><Icon size={18}/><span>{labels[id]}</span></button>)}</nav>
       <div className="recent-heading"><span>最近研究</span><span>{runs.length}</span></div>
       <div className="recent-list">{runs.slice(0,5).map(r=><button key={r.id} className={run?.id===r.id?'selected':''} onClick={()=>{selectRun(r.id);setTab('chat')}}><span className={'tiny-dot '+(r.state==='running'?'pulse':'')}/><span>{r.company}<small>{r.request.year} · {r.request.ticker}{r.request.mode==='sample'?' · 样例':''}</small></span></button>)}</div>
       <div className="sidebar-bottom"><span className="avatar">研</span><div>我的研究空间</div><ShieldCheck size={16}/></div>
@@ -83,13 +84,14 @@ export default function App(){
       {error&&<div className="error-banner" role="alert"><AlertCircle size={17}/><span>{error}</span><button onClick={()=>setError('')} aria-label="关闭错误"><X size={16}/></button></div>}
       {notice&&<div className="toast" role="status"><CheckCircle2 size={17}/>{notice}</div>}
       {loading?<div className="welcome"><LoaderCircle className="spin"/><p>正在载入研究空间…</p></div>:<>
-      {!run&& !['library','settings','chat','trash'].includes(tab)?<div className="welcome">
+      {!run&& !['library','settings','chat','trash','competition'].includes(tab)?<div className="welcome">
         <span className="eyebrow">从事实开始，形成判断</span><h1>你的下一份研究，<br/>每一个数字都有来处。</h1><p>把财务数据、原始披露和研究判断连接起来，<br/>从一份可复核的公司底稿开始。</p>
         <div className="button-row"><button className="primary" onClick={()=>setShowNew(true)}><Plus size={17}/>开始第一份研究</button><button className="secondary" disabled={creating} onClick={()=>start({...form,mode:'sample',ticker:'000333.SZ',year:2025,document_id:''})}>体验美的样例<ArrowRight size={16}/></button></div>
         <div className="welcome-features"><span><Database/>财务双源核对</span><span><FileSearch/>原始证据追溯</span><span><GitCompareArrows/>研究版本留痕</span></div>
       </div>:<>
-        {!['library','settings','chat','trash'].includes(tab)&&<div className="company-heading"><div className="company-title"><span className="company-mark">{run?.request.ticker==='000333.SZ'?'MD':run?.request.ticker.slice(0,2)}</span><div><div className="title-line"><h1>{run?.company}</h1><Badge>{run?.request.ticker}</Badge><Badge tone={run?.request.mode==='sample'?'amber':'blue'}>{run?.request.mode==='sample'?'样例回放':'实时研究'}</Badge></div><p>{year} 年度财务研究 <span>·</span> 数据截止 {run?.request.as_of} <span>·</span> 合并口径</p></div></div><div className="button-row">{busy?<button className="secondary" onClick={()=>act('/runs/'+run.id+'/cancel')}><Square size={13}/>取消研究</button>:<button className="secondary" onClick={()=>{setForm({...run.request,mode:'live',as_of:config.today});setShowNew(true)}}><Sparkles size={15}/>开展实时研究</button>}<button className="secondary" aria-label="删除当前研究" disabled={busy} onClick={()=>removeRun(run.id)}><Trash2 size={15}/>删除研究</button><button className="primary" onClick={()=>setShowExport(true)} disabled={!facts.length}><ArrowDownToLine size={16}/>导出底稿</button></div></div>}
+        {!['library','settings','chat','trash','competition'].includes(tab)&&<div className="company-heading"><div className="company-title"><span className="company-mark">{run?.request.ticker==='000333.SZ'?'MD':run?.request.ticker.slice(0,2)}</span><div><div className="title-line"><h1>{run?.company}</h1><Badge>{run?.request.ticker}</Badge><Badge tone={run?.request.mode==='sample'?'amber':'blue'}>{run?.request.mode==='sample'?'样例回放':'实时研究'}</Badge></div><p>{year} 年度财务研究 <span>·</span> 数据截止 {run?.request.as_of} <span>·</span> 合并口径</p></div></div><div className="button-row">{busy?<button className="secondary" onClick={()=>act('/runs/'+run.id+'/cancel')}><Square size={13}/>取消研究</button>:<button className="secondary" onClick={()=>{setForm({...run.request,mode:'live',as_of:config.today});setShowNew(true)}}><Sparkles size={15}/>开展实时研究</button>}<button className="secondary" aria-label="删除当前研究" disabled={busy} onClick={()=>removeRun(run.id)}><Trash2 size={15}/>删除研究</button><button className="primary" onClick={()=>setShowExport(true)} disabled={!facts.length}><ArrowDownToLine size={16}/>导出底稿</button></div></div>}
         {busy&&<div className="progress-panel"><LoaderCircle className="spin" size={18}/><div><strong>{run.events.at(-1)?.label||'准备研究'}</strong><span>{run.events.at(-1)?.detail}</span></div><b>{run.progress}%</b><div className="progress-track"><i style={{width:run.progress+'%'}}/></div></div>}
+        {tab==='competition'&&<CompetitionPanel run={run} onCreated={async(id:string)=>{await selectRun(id);await refreshRuns();setTab('overview')}}/>}
         {tab==='chat'&&<AgentChat key={run?.id||'free'} run={run} config={config} onRunUpdated={updated} onOpen={setTab} onNewResearch={()=>setShowNew(true)} prompt={chatPrompt} onPromptConsumed={()=>setChatPrompt('')}/>}
         {tab==='overview'&&run&&<div className={'research-layout '+(showEvidence?'with-evidence':'reading-view')}><main className="research-main">
           <div className="section-heading"><div><h2>财务概览</h2></div><div className="snapshot-actions"><span className="small-muted">人民币亿元</span><button className="text-link" aria-expanded={showEvidence} aria-controls="research-evidence" onClick={()=>setShowEvidence(!showEvidence)}><FileSearch size={14}/>{showEvidence?'收起来源':'查看来源'}</button></div></div>

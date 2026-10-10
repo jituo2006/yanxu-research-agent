@@ -1,0 +1,7 @@
+metric,year,value,unit,currency,scope,period_type,announced_date
+revenue,2025,120000000,元,CNY,consolidated,annual,2026-03-31
+revenue,2024,100000000,元,CNY,consolidated,annual,2026-03-31
+n_income_attr_p,2025,15000000,元,CNY,consolidated,annual,2026-03-31
+n_income_attr_p,2024,10000000,元,CNY,consolidated,annual,2026-03-31
+n_cashflow_act,2025,8000000,元,CNY,consolidated,annual,2026-03-31
+n_cashflow_act,2024,12000000,元,CNY,consolidated,annual,2026-03-31

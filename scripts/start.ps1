@@ -2,7 +2,7 @@ param([switch]$NoBrowser)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $pythonPath = Join-Path $projectRoot '.venv\Scripts\python.exe'
-$runtimeRoot = Join-Path $projectRoot 'var'
+$runtimeRoot = if ($env:RESEARCH_DATA_DIR) { $env:RESEARCH_DATA_DIR } else { Join-Path $projectRoot 'var' }
 $serviceUrl = 'http://127.0.0.1:8920'
 $versionMatch = [regex]::Match([System.IO.File]::ReadAllText((Join-Path $projectRoot 'app\config.py')), '(?m)^VERSION\s*=\s*"([^"]+)"')
 if (-not $versionMatch.Success) { throw 'Cannot read the local application version from app\config.py.' }
@@ -19,6 +19,8 @@ function Show-ResearchServer($health) {
     if ($health.version -ne $expectedVersion) {
         throw "Port 8920 is running v$($health.version), but this directory contains v$expectedVersion. Stop the old service with scripts\stop.ps1, then start again."
     }
+    $expectedCompetition = $env:RESEARCH_COMPETITION_MODE -eq '1'
+    if ([bool]$health.competition -ne $expectedCompetition) { throw 'Port 8920 is running another mode. Stop it before switching workspaces.' }
     $pageId = 'missing-build'
     if (Test-Path -LiteralPath $indexPath) {
         $hasher = [System.Security.Cryptography.SHA256]::Create()

@@ -6,6 +6,7 @@ Search snippets are leads, never read articles or verified financial facts.
 Network requests pin a validated public IP and revalidate every redirect.
 """
 from __future__ import annotations
+from . import competition
 
 import base64
 import hashlib
@@ -114,6 +115,7 @@ def _fetch(url, *, method="GET", data=None, json_body=None, headers=None, max_by
     deadline = time.monotonic() + 20
     with httpx.Client(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(10, connect=5)) as client:
         for hop in range(5):
+            competition.check_network(current)
             p, host, port, addresses = _public_addresses(current)
             if binary_pdf and not any(host == d or host.endswith("." + d) for d in ("cninfo.com.cn", "sse.com.cn", "szse.cn", "bse.cn", "csrc.gov.cn")):
                 raise RetrievalError("PDF 原文只允许来自交易所、巨潮和证监会公开披露域名")

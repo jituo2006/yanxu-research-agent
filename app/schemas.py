@@ -12,6 +12,7 @@ class RunRequest(BaseModel):
     document_id: str | None = None
     data_source: Literal["default","tushare","eastmoney","documents"] = "default"
     model_profile: str | None = None
+    material_ids: list[str] = Field(default_factory=list,max_length=20)
 
     @model_validator(mode="after")
     def check_time(self):

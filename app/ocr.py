@@ -1,3 +1,4 @@
+from . import competition
 """Optional local Windows OCR. Rendered pages and recognizer output stay on this machine."""
 import json
 import os
@@ -36,7 +37,7 @@ def recognize(path,pages):
     if os.name!='nt': raise ValueError("扫描页需要 OCR；当前本机识别仅支持 Windows 中文识别组件")
     with tempfile.TemporaryDirectory(prefix='research-ocr-') as temp:
         folder=Path(temp);manifest=[]
-        with pypdfium2.PdfDocument(path) as pdf:
+        with pypdfium2.PdfDocument(competition.read_bytes(path)) as pdf:
             for index in pages:
                 page=pdf[index-1]
                 try:

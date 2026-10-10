@@ -1,3 +1,4 @@
+from . import competition
 """Bounded research workflow; calculations and status never depend on prose."""
 import json
 import re
@@ -151,13 +152,14 @@ def model_research(run,pages,doc):
         gap(run,"model_unavailable",str(error))
         run["model"]={"status":"failed","calls":calls,"detail":str(error)}
 
+@competition.traced("research", "run_id")
 def execute(run_id):
     run=store.get_run(run_id); started=time.monotonic(); run["state"]="running"; req=run["request"]
     run["started_at"]=store.now()
     try:
         step(run,"检查研究边界",5,"锁定证券、年度和披露截止日")
         doc=None; pages=[]
-        doc_id=req.get("document_id") or (SAMPLE_ID if req["ticker"]=="000333.SZ" and req["year"]==2025 else None)
+        doc_id=req.get("document_id") or (SAMPLE_ID if not competition.POLICY["enabled"] and req["ticker"]=="000333.SZ" and req["year"]==2025 else None)
         if doc_id:
             doc=store.get_document(doc_id)
             step(run,"读取披露文件",12,doc["title"])
@@ -175,13 +177,13 @@ def execute(run_id):
             gap(run,"no_document","尚未提供匹配的年度报告 PDF，当前仅使用结构化数据")
         if req["mode"]=="sample":
             step(run,"读取历史快照",28,"样例使用 2026-09-28 保存的响应，不调用实时接口或模型")
-            payload=json.loads((FIXTURES/"tushare-snapshot.json").read_text(encoding="utf-8-sig"))
+            payload=competition.read_json(FIXTURES/"tushare-snapshot.json")
             for item in payload["results"]:
                 data=item["response"]["data"];rows=[dict(zip(data["fields"],r)) for r in data["items"]]
                 if item["api"]=="stock_basic": run["company"]=rows[0]["name"]
                 else: add_api_facts(run,item["api"],req["year"],eligible_record(rows,req["year"],req["as_of"]),payload["tested_at"])
             run["model"]={"status":"sample","detail":"样例回放：确定性底稿，未调用模型"}
-        elif req.get("data_source")=="documents":
+        elif competition.POLICY["enabled"] or req.get("data_source")=="documents":
             if req["ticker"]=="000333.SZ": run["company"]="美的集团"
             else:
                 from .securities import search
@@ -216,6 +218,7 @@ def execute(run_id):
                     snapshot(run,f"{api}-{year}",rows)
                     add_api_facts(run,api,year,eligible_record(rows,year,req["as_of"]),store.now())
                 except (ProviderError,ValueError) as error: gap(run,f"api-{api}-{year}",str(error))
+        competition.apply_materials(run)
         step(run,"计算与交叉核验",64,"代码计算同比；保留口径、来源和缺口")
         if not run["facts"]:
             run["state"]="blocked";gap(run,"no_facts","没有可用于本次研究的财务事实");store.save_run(run);return

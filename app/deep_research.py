@@ -9,7 +9,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
-from . import store, documents, disclosures, web_research
+from . import store, documents, disclosures, web_research, competition
 from .providers import model_json, ProviderError
 from .config import VERSION
 from .report_state import valuation_snapshot, link_report_valuations
@@ -293,7 +293,9 @@ def build(run_id, question, chat=None, progress=None):
     for existing in attached:
         pages=documents.ensure_index(existing)
         store.update_run(run_id,lambda r:documents.refresh_material_availability(r,existing,pages))
-    if not full_annual:
+    local_only=competition.POLICY["enabled"] and not competition.POLICY["retrieval_origins"]
+    if local_only: limitations.append("比赛模式只用指定材料，未执行外部资料检索")
+    if not full_annual and not local_only:
         try:
             doc = disclosures.fetch_annual(ticker, req["year"], cutoff)
             if chat.get("id"):
@@ -320,6 +322,8 @@ def build(run_id, question, chat=None, progress=None):
         # Comparative statement/notes are often far from management's summary.
         register_sources(chat,documents.search_attached(chat,['合并利润表','信用减值损失','资产减值损失']))
     def gather(qs, read_limit):
+        if local_only:
+            return {"results":[],"limitations":["比赛模式资料网络未许可"]}
         update("联网查找并读取来源正文")
         found = web_research.search(qs, as_of=cutoff, max_results=18)
         register_sources(chat, found)

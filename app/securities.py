@@ -12,6 +12,11 @@ LOCK=threading.Lock()
 last_attempt=0.0
 
 def directory(refresh=False):
+    from . import competition
+    if competition.POLICY["enabled"]:
+        path=DATA/"securities.json"
+        if path.exists(): return competition.read_json(path) | {"stale":True,"note":"比赛固定目录，不联网刷新"}
+        return fallback("比赛模式仅使用工作区证券目录和历史研究")
     global last_attempt
     path=DATA/"securities.json"
     with LOCK:

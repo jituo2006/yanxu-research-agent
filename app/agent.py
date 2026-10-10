@@ -1,3 +1,4 @@
+from . import competition
 """A bounded tool-using agent. Public steps are actions, never hidden reasoning."""
 import json
 import re
@@ -203,10 +204,14 @@ def grounded_assumptions(chat,method,assumptions,quotes):
         if previous and key in previous["assumptions"] and Decimal(previous["assumptions"][key])==value: continue
         raise ValueError("参数 "+key+" 缺少可核对的依据。若用户已明确给出，请原样引用其消息并重试一次，不要要求重复确认；否则先讨论数值。")
 
+@competition.traced("tool")
 def tool(chat,name,args):
+    competition.audit("tool_arguments",tool=name,arguments=args,conversation_id=chat.get("id"),run_id=chat.get("run_id"))
     # Reload the human turn; neither stale context nor model arguments grant permission.
     if chat.get('id'): chat=store.get_conversation(chat['id'])
     enforce(chat,name)
+    if competition.POLICY["enabled"] and not competition.POLICY["retrieval_origins"] and name in ("web_search","read_webpage","read_web_page","read_public_pdf","fetch_annual_report"):
+        raise competition.PolicyError("比赛模式只用指定材料，请读取现有资料或说明缺口")
     if name=="search_company": return securities.search(str(args.get("query",""))[:80])
     if name=="attach_document": return documents.attach(chat["id"],args.get("document_id"),allow_running=True)
     if name=="fetch_annual_report":
@@ -243,6 +248,9 @@ def tool(chat,name,args):
                        mode="live",use_model=False,data_source=chat["data_source"],model_profile=chat["profile_id"],
                        document_id=args.get("document_id"))
         if req.document_id: store.get_document(req.document_id)
+        if competition.POLICY["enabled"]:
+            req.data_source="documents"
+            req.material_ids=[m["id"] for m in competition.materials() if m["ticker"]==req.ticker and m["year"]==req.year]
         run=store.create_run(req.model_dump(mode="json"))
         store.update_conversation(chat["id"],lambda c:c.update(run_id=run["id"]))
         research.execute(run["id"])
@@ -328,6 +336,7 @@ def memo_tool_for_request(name,chat,results):
     return 'refine_investment_memo' if failed or (reuse and run.get('memo')) else name
 
 
+@competition.traced("agent", "conversation_id")
 def execute(cid):
     start=time.monotonic();chat=store.get_conversation(cid);turn_id=chat["turn_id"];results=[];unit_retries=0
     user_text=latest_user(chat)
@@ -343,7 +352,7 @@ def execute(cid):
             feedback_note=results[-1].get('validation_feedback','') if results else ''
             budget_note="\n本轮已到最后一次决策，只能 respond：总结已经取得的材料、原文页码与未核实项，不再调用工具。" if decision_index==7 else ""
             decision,meta=model_json(SYSTEM+'\n'+feedback_note+budget_note,{"today":date.today().isoformat(),"context":context(chat),"decisions_remaining":8-decision_index,
-                "valuation_methods":valuation.CATALOG,
+                "valuation_methods":valuation.CATALOG,"competition_policy":competition.POLICY,
                 "proposed_scenarios":chat.get("proposals",[])[-4:],
                 "conversation":[{"role":m["role"],"content":m["content"]} for m in chat["messages"][-24:]],
                 "tool_results":results,"data_source":chat["data_source"],"user_constraints":constraints(latest_user(chat)),

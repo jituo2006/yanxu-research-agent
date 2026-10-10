@@ -1,3 +1,4 @@
+from . import competition
 import json
 import time
 from urllib.parse import urlparse
@@ -13,6 +14,7 @@ def tushare(api,params,fields):
         raise ProviderError("未配置 Tushare Token")
     for attempt in range(2):
         try:
+            competition.check_network("https://api.tushare.pro")
             response=httpx.post("https://api.tushare.pro",json={"api_name":api,"token":cfg["token"],"params":params,"fields":fields},timeout=25)
             response.raise_for_status()
             payload=response.json()
@@ -52,6 +54,8 @@ def model_json(system,payload,max_tokens=2400,profile_id=None,reasoning=False):
                 body["thinking"]={"type":"enabled" if reasoning else "disabled"}
                 if reasoning: body["max_tokens"]=max_tokens+8000
                 else: body["temperature"]=0.1
+        competition.check_network(cfg["base"]+endpoint,"model")
+        competition.audit("model_request",model=cfg["model"],protocol=cfg["protocol"],system=prompt,payload=payload,max_tokens=max_tokens)
         response=httpx.post(cfg["base"]+endpoint,headers=headers,json=body,timeout=180 if reasoning else 80)
         response.raise_for_status()
         data=response.json()
@@ -66,8 +70,10 @@ def model_json(system,payload,max_tokens=2400,profile_id=None,reasoning=False):
         content=content.strip();fence=chr(96)*3
         if content.startswith(fence): content=content.split("\n",1)[-1].rsplit(fence,1)[0].strip()
         value=json.loads(content)
+        competition.audit("model_response",model=cfg["model"],result=value,usage=data.get("usage",{}),elapsed_ms=int((time.monotonic()-started)*1000))
         if not isinstance(value,dict): raise ValueError()
         return value,{"model":cfg["model"],"provider":cfg["provider"],"connection_id":cfg["id"],"reasoning_enabled":bool(reasoning and cfg["provider"]=="deepseek"),"elapsed_ms":int((time.monotonic()-started)*1000),"usage":data.get("usage",{})}
+    except competition.PolicyError: raise
     except httpx.HTTPStatusError as error:
         raise ProviderError(f"模型接口返回 HTTP {error.response.status_code}；请检查当前服务的密钥、模型名和接口协议") from None
     except (httpx.HTTPError,ValueError,KeyError,IndexError):
@@ -78,6 +84,7 @@ def list_models(profile_id):
     cfg=resolve_model(profile_id)
     headers={"x-api-key":cfg["key"],"anthropic-version":"2023-06-01"} if cfg["protocol"]=="anthropic" else ({"Authorization":"Bearer "+cfg["key"]} if cfg["key"] else {})
     try:
+        competition.check_network(cfg["base"]+"/models","model")
         response=httpx.get(cfg["base"]+"/models",headers=headers,timeout=15)
         response.raise_for_status()
         models=[v["id"] for v in response.json().get("data",[]) if isinstance(v.get("id"),str)]

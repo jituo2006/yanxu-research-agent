@@ -22,6 +22,7 @@ def run(isolated):
     research.execute(r["id"])
     return store.get_run(r["id"])
 
+@pytest.mark.skipif(__import__("os").name != "nt", reason="Windows DPAPI integration requires Windows")
 def test_secrets_encrypted_and_preserved(isolated):
     p=ProfileRequest(id="test",name="Test",provider="custom",base="https://example.com/v1",model="demo",api_key="not-a-real-secret").model_dump()
     public=connections.save_profile(p)

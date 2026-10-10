@@ -1,3 +1,4 @@
+from . import competition
 """Public annual statements, normalized to the same audited fact contract."""
 import re
 import httpx
@@ -13,6 +14,7 @@ class Eastmoney:
         self.code=exchange+symbol
         self.source_url=BASE+"Index?type=web&code="+self.code.lower()
         try:
+            competition.check_network(self.source_url)
             response=httpx.get(self.source_url,timeout=20)
             response.raise_for_status()
             tag=re.search(r'<input[^>]*id=["\']hidctype["\'][^>]*>',response.text)
@@ -26,6 +28,7 @@ class Eastmoney:
         params={"companyType":self.company_type,"reportDateType":0,"reportType":1,
                 "code":self.code,"dates":f"{year}-12-31"}
         try:
+            competition.check_network(BASE+ENDPOINTS[api])
             response=httpx.get(BASE+ENDPOINTS[api],params=params,timeout=25)
             response.raise_for_status()
             data=response.json().get("data") or []

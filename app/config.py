@@ -9,7 +9,7 @@ VERSION = "0.3.1"
 
 def legacy_settings():
     # Read existing credentials locally; never copy them into the product or UI.
-    legacy = dotenv_values(Path.home() / ".vibe-trading" / ".env")
+    legacy = {} if os.environ.get("RESEARCH_COMPETITION_MODE", "").lower() in ("1","true","yes") else dotenv_values(Path.home() / ".vibe-trading" / ".env")
     own = {k: v for k, v in dotenv_values(ROOT / ".env").items() if v}
     values = {**legacy, **own, **os.environ}
     return {

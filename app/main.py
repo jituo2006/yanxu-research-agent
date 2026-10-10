@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 import pdfplumber
 import pypdfium2
 from .config import ROOT,DATA,VERSION,settings
-from . import store,documents,connections,securities,valuation,disclosures
+from . import store,documents,connections,securities,valuation,disclosures,competition
 from .schemas import RunRequest,ScenarioRequest,ReviewRequest,ProfileRequest,PreferencesRequest,ValuationRequest,ConversationRequest,TurnRequest,ReportRequest
 from .providers import ProviderError,model_json,list_models
 from .finance import scenario,audit_text
@@ -39,6 +39,8 @@ async def local_origin(request:Request,call_next):
         if origin and urlparse(origin).hostname not in ("127.0.0.1","localhost"):
             return JSONResponse({"detail":"只接受本机工作台发起的操作"},status_code=403)
     response = await call_next(request)
+    if request.method not in ("GET","HEAD","OPTIONS"):
+        competition.audit("api_action",method=request.method,path=request.url.path,status=response.status_code)
     if request.url.path in ('/', '/index.html', '/api/health', '/api/settings'):
         # A desktop launcher must fetch the current shell and running version.
         # Hashed JS/CSS assets can retain their normal browser caching behavior.
@@ -68,7 +70,7 @@ def launch(run):
 
 @app.get("/api/health")
 def health():
-    return {"status":"ok","service":"Research Desk","version":VERSION}
+    return {"status":"ok","service":"Research Desk","version":VERSION,"competition":competition.POLICY["enabled"]}
 
 @app.get("/api/settings")
 def configuration():
@@ -121,8 +123,10 @@ def create(request:RunRequest):
     if request.document_id: store.get_document(request.document_id)
     payload=request.model_dump(mode="json");config=connections.load()
     if payload["data_source"]=="default": payload["data_source"]=config["data_source"]
+    if competition.POLICY["enabled"] and payload["mode"]=="live": payload["data_source"]="documents"
     payload["model_profile"]=payload["model_profile"] or config["active_model"]
     connections.resolve_model(payload["model_profile"])
+    for identity in payload["material_ids"]: competition.read_material(identity)
     return launch(store.create_run(payload))
 
 @app.get("/api/runs/{run_id}/valuation-options")
@@ -309,14 +313,16 @@ def upload(file:UploadFile=File(...),ticker:str=Form(...),year:int=Form(...),ann
 
 @app.get("/api/documents/{doc_id}/file")
 def source(doc_id:str):
-    return FileResponse(store.get_document(doc_id)["path"],media_type="application/pdf")
+    path=competition.check_file(store.get_document(doc_id)["path"])
+    competition.read_bytes(path)
+    return FileResponse(path,media_type="application/pdf")
 
 @app.get("/api/documents/{doc_id}/pages/{page}")
 def page_image(doc_id:str,page:int):
     doc=store.get_document(doc_id);folder=DATA/"page-images";folder.mkdir(exist_ok=True)
     output=folder/f"{doc_id}-{page}.png"
     if not output.exists():
-        with documents.PDF_LOCK, pypdfium2.PdfDocument(doc["path"]) as pdf:
+        with documents.PDF_LOCK, pypdfium2.PdfDocument(competition.read_bytes(doc["path"])) as pdf:
             if not 1<=page<=len(pdf): raise HTTPException(404,"页码不存在")
             pdf_page=pdf[page-1]
             try:
@@ -325,6 +331,22 @@ def page_image(doc_id:str,page:int):
                 finally: bitmap.close()
             finally: pdf_page.close()
     return FileResponse(output,media_type="image/png")
+
+@app.get("/api/competition")
+def competition_status(): return competition.status()
+
+@app.get("/api/competition/materials")
+def competition_materials(): return competition.materials()
+
+@app.post("/api/competition/materials")
+def competition_import(file:UploadFile=File(...),ticker:str=Form(...),year:int=Form(...),announced_date:str|None=Form(None)):
+    return competition.register_material(file.file.read(10*1024*1024+1),file.filename or "material.json",ticker,year,announced_date)
+
+@app.get("/api/runs/{run_id}/submission")
+def competition_export(run_id:str):
+    run=store.get_run(run_id)
+    if run['state'] in ('queued','running'): raise ValueError('请等待任务结束后导出提交包')
+    return Response(competition.submission_bundle(run),media_type='application/zip',headers={'Content-Disposition':f'attachment; filename="submission-{run_id}.zip"'})
 
 dist=ROOT/"web"/"dist"
 app.mount("/",StaticFiles(directory=dist,html=True,check_dir=False),name="web")

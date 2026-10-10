@@ -1,3 +1,4 @@
+from . import competition
 import json
 import re
 from copy import deepcopy
@@ -77,7 +78,7 @@ def evidence_bundle(run, get_document, snapshot_dir):
         if not re.fullmatch(r'[\w-]+',doc_id): continue
         try:
             doc=get_document(doc_id)
-            content=Path(doc['path']).read_bytes()
+            content=competition.read_bytes(doc['path'])
         except (KeyError,OSError):
             unavailable.append(doc_id);continue
         path='documents/'+doc_id+'.pdf';paths[doc_id]=path;files[path]=content
@@ -91,7 +92,7 @@ def evidence_bundle(run, get_document, snapshot_dir):
     files['audit.md']=markdown(run,audit=True,document_paths=paths).encode('utf-8')
     files['audit.html']=printable(run,audit=True,document_paths=paths).encode('utf-8')
     files['run.json']=json.dumps(run,ensure_ascii=False,indent=2).encode('utf-8')
-    for file in snapshot_dir.glob('*.json'): files['snapshots/'+file.name]=file.read_bytes()
+    for file in snapshot_dir.glob('*.json'): files['snapshots/'+file.name]=competition.read_bytes(file)
     references=[]
     for url in sorted(urls):
         target=rewrite_document_links(url,paths)
